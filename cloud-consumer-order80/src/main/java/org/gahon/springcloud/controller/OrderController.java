@@ -5,6 +5,9 @@ import cn.hutool.json.JSONUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.gahon.springcloud.entity.CommonResult;
 import org.gahon.springcloud.entity.Payment;
+import org.gahon.springcloud.lb.LoadBalancer;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
+import java.net.URI;
+import java.util.List;
 
 /**
  * @author Gahon
@@ -29,6 +34,11 @@ public class OrderController {
     @Resource
     private RestTemplate restTemplate;
 
+    @Resource
+    LoadBalancer loadBalancer;
+
+    @Resource
+    DiscoveryClient discoveryClient;
 
     @GetMapping("/payment/create")
     public CommonResult<Payment> create(Payment payment) {
@@ -40,7 +50,7 @@ public class OrderController {
         return restTemplate.getForObject(PAYMENT_URL + "/payment/get/" + id, CommonResult.class);
     }
 
-    @GetMapping("/consumer/payment/getForEntity/{id}")
+    @GetMapping("/payment/getForEntity/{id}")
     public CommonResult<Payment> getPayment2(@PathVariable("id") Long id) {
         ResponseEntity<CommonResult> entity = restTemplate.getForEntity(PAYMENT_URL + "/payment/get/" + id,
                                                                         CommonResult.class);
@@ -50,5 +60,15 @@ public class OrderController {
         } else {
             return new CommonResult<>(444, "操作失败");
         }
+    }
+
+    @GetMapping("/payment/lb")
+    public String getPaymentLb(){
+
+        List<ServiceInstance> instances = discoveryClient.getInstances("CLOUD-PAYMENT-SERVICE");
+
+        ServiceInstance serviceInstance = loadBalancer.instances(instances);
+        URI uri = serviceInstance.getUri();
+        return restTemplate.getForObject(uri + "/payment/lb", String.class);
     }
 }
